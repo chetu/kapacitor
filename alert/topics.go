@@ -85,7 +85,17 @@ func (s *Topics) EventState(topic, event string) (EventState, bool) {
 	return t.EventState(event)
 }
 
+// Collect collects an event and handles the event.
 func (s *Topics) Collect(event Event) error {
+	return s.collect(event, true)
+}
+
+// CollectNoHandle collects an event and updates state but does no handling of the event
+func (s *Topics) CollectNoHandle(event Event) error {
+	return s.collect(event, false)
+}
+
+func (s *Topics) collect(event Event, handle bool) error {
 	s.mu.RLock()
 	topic := s.topics[event.Topic]
 	s.mu.RUnlock()
@@ -102,7 +112,7 @@ func (s *Topics) Collect(event Event) error {
 		s.mu.Unlock()
 	}
 
-	return topic.handleEvent(event)
+	return topic.collect(event, handle)
 }
 
 func (s *Topics) DeleteTopic(topic string) {
@@ -338,14 +348,20 @@ func (t *Topic) close() {
 	vars.DeleteStatistic(t.statsKey)
 }
 
-func (t *Topic) handleEvent(event Event) error {
+func (t *Topic) collect(event Event, handle bool) error {
 	prev, ok := t.updateEvent(event.State)
 	if ok {
 		event.previousState = prev
 	}
 
 	t.collected.Add(1)
+	if handle {
+		return t.handleEvent(event)
+	}
+	return nil
+}
 
+func (t *Topic) handleEvent(event Event) error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 

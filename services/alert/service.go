@@ -661,6 +661,14 @@ func (s *Service) EventState(topic, event string) (alert.EventState, bool) {
 }
 
 func (s *Service) Collect(event alert.Event) error {
+	return s.collect(event, true)
+}
+
+func (s *Service) CollectNoHandle(event alert.Event) error {
+	return s.collect(event, false)
+}
+
+func (s *Service) collect(event alert.Event, handle bool) error {
 	s.mu.RLock()
 	closed := s.closedTopics[event.Topic]
 	s.mu.RUnlock()
@@ -671,7 +679,12 @@ func (s *Service) Collect(event alert.Event) error {
 		}
 	}
 
-	err := s.topics.Collect(event)
+	var err error
+	if handle {
+		err = s.topics.Collect(event)
+	} else {
+		err = s.topics.CollectNoHandle(event)
+	}
 	if err != nil {
 		return err
 	}
